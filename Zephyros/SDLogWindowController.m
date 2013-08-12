@@ -18,9 +18,8 @@
 @property NSMutableArray* replHistory;
 @property NSInteger replHistoryPos;
 
-@property IBOutlet WebView* webView;
-@property (copy) dispatch_block_t beforeReady;
-@property BOOL ready;
+@property IBOutlet NSTextView* textView;
+@property NSMutableAttributedString* logString;
 
 @property SDClient* replClient;
 
@@ -33,6 +32,7 @@
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         sharedMessageWindowController = [[SDLogWindowController alloc] init];
+        sharedMessageWindowController.logString = [[NSMutableAttributedString alloc] init];
     });
     return sharedMessageWindowController;
 }
@@ -61,17 +61,8 @@
 }
 
 - (IBAction) clearLog:(id)sender {
-    DOMDocument* doc = [self.webView mainFrameDocument];
-    [doc body].innerHTML = @"";
-}
-
-- (void)webView:(WebView *)sender didFinishLoadForFrame:(WebFrame *)frame {
-    self.ready = YES;
-    
-    if (self.beforeReady) {
-        self.beforeReady();
-        self.beforeReady = nil;
-    }
+//    DOMDocument* doc = [self.webView mainFrameDocument];
+//    [doc body].innerHTML = @"";
 }
 
 - (void) showCurrentReplHistoryItem {
@@ -116,52 +107,51 @@
     self.window.level = NSFloatingWindowLevel;
     
     self.replHistory = [NSMutableArray array];
-    self.webView.frameLoadDelegate = self;
+//    self.webView.frameLoadDelegate = self;
     
-    NSURL* path = [[NSBundle mainBundle] URLForResource:@"logwindow" withExtension:@"html"];
-    NSString* html = [NSString stringWithContentsOfURL:path encoding:NSUTF8StringEncoding error:NULL];
-    [[self.webView mainFrame] loadHTMLString:html baseURL:[NSURL URLWithString:@""]];
+//    NSURL* path = [[NSBundle mainBundle] URLForResource:@"logwindow" withExtension:@"html"];
+//    NSString* html = [NSString stringWithContentsOfURL:path encoding:NSUTF8StringEncoding error:NULL];
+//    [[self.webView mainFrame] loadHTMLString:html baseURL:[NSURL URLWithString:@""]];
     
     [[self window] center];
 }
 
-- (void) doWhenReady:(dispatch_block_t)blk {
-    if (self.ready)
-        blk();
-    else
-        self.beforeReady = blk;
-}
-
 - (void) log:(NSString*)message type:(NSString*)type {
-    [self window]; // le sigh
+    NSString* str = [NSString stringWithFormat:@"%@\n"];
     
-    [self doWhenReady:^{
-        DOMDocument* doc = [self.webView mainFrameDocument];
-        
-        NSString* classname = [@{SDLogMessageTypeError: @"error",
-                               SDLogMessageTypeUser: @"user",
-                               SDLogMessageTypeREPL: @"repl",
-                               SDLogMessageTypeRequest: @"request",
-                               SDLogMessageTypeResponse: @"response"} objectForKey:type];
-        
-        NSDateFormatter* stampFormatter = [[NSDateFormatter alloc] init];
-        stampFormatter.dateStyle = NSDateFormatterNoStyle;
-        stampFormatter.timeStyle = kCFDateFormatterMediumStyle;
-        
-        DOMHTMLDivElement* div = (id)[doc createElement:@"div"];
-        div.className = classname;
-        [[doc body] appendChild:div];
-        
-        DOMHTMLElement* stamp = (id)[doc createElement:@"small"];
-        stamp.innerText = [stampFormatter stringFromDate:[NSDate date]];
-        [div appendChild:stamp];
-        
-        DOMHTMLParagraphElement* p = (id)[doc createElement:@"p"];
-        p.innerText = message;
-        [div appendChild:p];
-        
-        [[self.webView windowScriptObject] evaluateWebScript:@"window.scrollTo(0, document.body.scrollHeight);"];
-    }];
+    NSAttributedString* as = [[NSAttributedString alloc] initWithString:message];
+    
+    [self willChangeValueForKey:@"logString"];
+    [self.logString appendAttributedString:as];
+    [self didChangeValueForKey:@"logString"];
+    
+//    [self window]; // le sigh
+    
+//        DOMDocument* doc = [self.webView mainFrameDocument];
+//        
+//        NSString* classname = [@{SDLogMessageTypeError: @"error",
+//                               SDLogMessageTypeUser: @"user",
+//                               SDLogMessageTypeREPL: @"repl",
+//                               SDLogMessageTypeRequest: @"request",
+//                               SDLogMessageTypeResponse: @"response"} objectForKey:type];
+//        
+//        NSDateFormatter* stampFormatter = [[NSDateFormatter alloc] init];
+//        stampFormatter.dateStyle = NSDateFormatterNoStyle;
+//        stampFormatter.timeStyle = kCFDateFormatterMediumStyle;
+//        
+//        DOMHTMLDivElement* div = (id)[doc createElement:@"div"];
+//        div.className = classname;
+//        [[doc body] appendChild:div];
+//        
+//        DOMHTMLElement* stamp = (id)[doc createElement:@"small"];
+//        stamp.innerText = [stampFormatter stringFromDate:[NSDate date]];
+//        [div appendChild:stamp];
+//        
+//        DOMHTMLParagraphElement* p = (id)[doc createElement:@"p"];
+//        p.innerText = message;
+//        [div appendChild:p];
+//        
+//        [[self.webView windowScriptObject] evaluateWebScript:@"window.scrollTo(0, document.body.scrollHeight);"];
 }
 
 - (void) show:(NSString*)message type:(NSString*)type {
